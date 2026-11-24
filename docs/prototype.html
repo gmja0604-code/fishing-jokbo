@@ -1,0 +1,617 @@
+<title>낚시 족보</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-screen phone app — header, view area, bottom tab bar; on wide screens the phone column is centred */
+:root{
+  --sea:#0f3b4c; --sea-2:#15536a; --foam:#e8f1f2; --land:#e9e3d3; --land-line:#cfc6b0;
+  --bg:#f3f6f6; --card:#ffffff; --fg:#13262e; --muted:#5d7079; --line:#d8e1e3;
+  --accent:#ff6a2b; --accent-soft:#ffe6da; --good:#1f9d6b; --warn:#d9930b; --crit:#d6453d;
+  --water:#cfe3e8; --water-2:#b9d6dd;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1519; --card:#13232a; --fg:#e4eef0; --muted:#93a8b0; --line:#25393f;
+  --land:#24302c; --land-line:#34443e; --water:#0f2a33; --water-2:#123642; --foam:#1a313a;
+  --accent-soft:#3a2216; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1519; --card:#13232a; --fg:#e4eef0; --muted:#93a8b0; --line:#25393f;
+  --land:#24302c; --land-line:#34443e; --water:#0f2a33; --water-2:#123642; --foam:#1a313a;
+  --accent-soft:#3a2216; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;overflow:hidden}
+.app{max-width:440px;height:100%;margin:0 auto;display:flex;flex-direction:column;background:var(--bg);position:relative;border-inline:1px solid var(--line)}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--sea);color:#fff}
+.logo{font-weight:900;font-size:19px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.logo .float{width:10px;height:22px;border-radius:5px;background:linear-gradient(var(--accent) 55%,#fff 55%)}
+.chip-live{font-size:11px;display:flex;align-items:center;gap:6px;opacity:.9}
+.chip-live i{width:7px;height:7px;border-radius:50%;background:#5fe0a6;box-shadow:0 0 0 3px rgba(95,224,166,.25)}
+main{flex:1;overflow-y:auto;position:relative;min-height:0}
+.view{display:none;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.view.on{display:flex;flex-direction:column;gap:14px}
+#v-map{padding:0;gap:0;height:100%}
+nav.tabs{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line);background:var(--card);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs button{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 9px;font-size:11px;color:var(--muted)}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-selected="true"]{color:var(--fg);font-weight:700}
+nav.tabs button.rec .plus{width:42px;height:42px;margin-top:-20px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(255,106,43,.4)}
+nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* map */
+.mapwrap{position:relative;height:100%;min-height:420px;overflow:hidden;background:var(--water)}
+.mapwrap svg.map{width:100%;height:100%;display:block}
+.pin{cursor:pointer}
+.pin:focus-visible circle{stroke:var(--accent);stroke-width:3}
+.map-filter{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.pill{all:unset;cursor:pointer;white-space:nowrap;font-size:12px;padding:6px 11px;border-radius:999px;background:var(--card);color:var(--fg);border:1px solid var(--line);display:inline-flex;align-items:center;gap:6px}
+.pill .dot{width:8px;height:8px;border-radius:50%}
+.pill[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.pill:focus-visible{outline:2px solid var(--accent)}
+.map-legend{position:absolute;left:10px;bottom:10px;font-size:10.5px;color:var(--muted);background:var(--card);padding:4px 8px;border-radius:6px;border:1px solid var(--line)}
+.mapmode{position:absolute;top:50px;left:10px;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;z-index:2}
+.mapmode button{all:unset;cursor:pointer;font-size:11.5px;font-weight:700;padding:7px 10px;text-align:center;color:var(--muted);border-top:1px solid var(--line)}
+.mapmode button:first-child{border-top:0}
+.mapmode button[aria-pressed="true"]{background:var(--sea);color:#fff}
+.tilt{width:100%;height:100%;transition:transform .5s ease}
+.mode-3d .tilt{transform:perspective(720px) rotateX(42deg) scale(1.28) translateY(-6%);transform-origin:50% 60%}
+.mode-3d{background:linear-gradient(#9fc7e8,#d7e9f3 38%,var(--water) 38%)}
+@media (prefers-reduced-motion:reduce){.tilt{transition:none}}
+.lvl{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.12);padding:4px 8px 4px 4px;border-radius:999px;cursor:pointer;border:0;color:#fff;font-family:inherit}
+.lvl .badge{width:22px;height:22px;border-radius:50%;background:var(--accent);display:grid;place-items:center;font-family:var(--font-data);font-size:11px}
+.lvl .xpbar{width:46px;height:5px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden}
+.lvl .xpbar i{display:block;height:100%;background:#ffd36b}
+.hero{background:linear-gradient(135deg,var(--sea),var(--sea-2));color:#fff;border-radius:16px;padding:16px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
+.ring{width:72px;height:72px}
+.hero h2{color:#fff}
+.hero .xp{height:8px;border-radius:4px;background:rgba(255,255,255,.2);overflow:hidden;margin-top:8px}
+.hero .xp i{display:block;height:100%;background:linear-gradient(90deg,#ffd36b,var(--accent))}
+.hero small{opacity:.8;font-size:11.5px}
+.trip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.trip .stat{text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal span{aspect-ratio:1;border-radius:6px;background:var(--foam);font-size:10px;display:grid;place-items:center;color:var(--muted);font-family:var(--font-data)}
+.cal span.f{background:var(--sea-2);color:#fff;font-weight:700}
+.cal span.f2{background:var(--accent);color:#fff;font-weight:700}
+.cal span.h{background:none}
+.dex{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.dex div{border-radius:12px;padding:10px 4px 8px;text-align:center;font-size:11px;background:var(--bg);border:1px solid var(--line)}
+.dex div svg{width:44px;height:22px;display:block;margin:0 auto 4px}
+.dex div.lock{opacity:.45}
+.dex div b{display:block;font-size:11.5px}
+.badges{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.badges div{text-align:center;font-size:11px;padding:10px 4px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.badges div .m{width:40px;height:40px;margin:0 auto 6px;border-radius:50%;display:grid;place-items:center;font-weight:900;color:#fff;font-size:13px}
+.badges div.lock{opacity:.45}
+.badges div.lock .m{background:var(--muted)!important}
+.quest{display:flex;flex-direction:column;gap:10px}
+.quest .q{display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:13px}
+.quest .q .bar{grid-column:1/-1;margin:0}
+.xpfly{position:absolute;left:50%;top:40%;transform:translateX(-50%);z-index:40;font-family:var(--font-data);font-weight:700;font-size:26px;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,.2);animation:fly 1.4s ease-out forwards;pointer-events:none}
+@keyframes fly{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}20%{opacity:1;transform:translate(-50%,0) scale(1.1)}100%{opacity:0;transform:translate(-50%,-60px) scale(1)}}
+@media (prefers-reduced-motion:reduce){.xpfly{animation:none;opacity:0}}
+.startfab{all:unset;cursor:pointer;position:absolute;left:50%;bottom:44px;transform:translateX(-50%);background:var(--accent);color:#fff;font-weight:900;font-size:14px;padding:12px 20px;border-radius:999px;box-shadow:0 6px 18px rgba(255,106,43,.45);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.startfab:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.sessbar{position:absolute;left:10px;right:10px;bottom:44px;background:var(--sea);color:#fff;border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.sessbar .rec{width:10px;height:10px;border-radius:50%;background:#ff5a4f;animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.25}}
+.sessbar b{font-family:var(--font-data);font-size:16px}
+.sessbar .btn{padding:8px 12px;margin-left:auto}
+.mylocate{position:absolute;right:12px;bottom:12px;all:unset;cursor:pointer;position:absolute;width:42px;height:42px;border-radius:50%;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;color:var(--sea-2)}
+/* sheet */
+.sheet-bg{position:absolute;inset:0;background:rgba(5,20,26,.35);z-index:20}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:21;background:var(--card);border-radius:18px 18px 0 0;max-height:82%;overflow-y:auto;padding:8px 16px 18px;box-shadow:0 -8px 30px rgba(0,0,0,.18)}
+.sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 10px}
+h2{font-size:18px;margin:0;font-weight:900;letter-spacing:-.02em;text-wrap:balance}
+h3{font-size:14px;margin:0 0 8px;font-weight:700}
+.sub{color:var(--muted);font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.between{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.btn{all:unset;cursor:pointer;text-align:center;font-weight:700;font-size:13px;padding:10px 14px;border-radius:10px;background:var(--foam);color:var(--fg);border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--bg);border-radius:10px;padding:10px}
+.stat b{display:block;font-family:var(--font-data);font-size:18px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--muted)}
+.amen{display:flex;flex-direction:column;gap:0}
+.amen div{display:grid;grid-template-columns:56px 1fr auto;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:13px;align-items:center}
+.amen div:first-child{border-top:0}
+.tag{font-size:11px;font-weight:700;color:var(--muted)}
+.tag-open{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px}
+.open{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
+.soon{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.closed{background:color-mix(in srgb,var(--crit) 15%,transparent);color:var(--crit)}
+.jokbo-line{background:var(--accent-soft);border-radius:12px;padding:12px;font-size:13px;line-height:1.55}
+.jokbo-line b{color:var(--accent)}
+/* toast */
+.toast{position:absolute;top:10px;left:10px;right:10px;z-index:30;background:var(--sea);color:#fff;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 8px 24px rgba(0,0,0,.25);cursor:pointer;animation:drop .35s ease-out}
+.toast .ic{flex:none;width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.toast p{margin:2px 0 0;font-size:12.5px;line-height:1.45;opacity:.92}
+.toast strong{font-size:13.5px}
+.toast .x{all:unset;cursor:pointer;margin-left:auto;opacity:.7;padding:0 4px;font-size:18px;line-height:1}
+@keyframes drop{from{transform:translateY(-16px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}.spin{animation:none!important}}
+/* conditions */
+.cond{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cond .stat b{font-size:17px}
+.updated{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.spin{display:inline-block;width:10px;height:10px;border:2px solid var(--line);border-top-color:var(--good);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.alert{border-radius:12px;padding:11px 12px;font-size:13px;display:flex;gap:8px;align-items:flex-start;background:color-mix(in srgb,var(--warn) 14%,var(--card));border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+.alert b{color:var(--warn)}
+.tide svg{width:100%;height:auto;display:block}
+.seg{display:flex;background:var(--foam);border-radius:10px;padding:3px;gap:3px}
+.seg button{all:unset;cursor:pointer;flex:1;text-align:center;font-size:12.5px;padding:7px 0;border-radius:8px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+/* jokbo */
+.rank{display:flex;flex-direction:column;gap:8px}
+.rank .r{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;font-size:13px}
+.rank .n{font-family:var(--font-data);color:var(--muted)}
+.bar{height:8px;border-radius:4px;background:var(--foam);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;border-radius:4px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:110px;padding-top:6px}
+.bars .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;color:var(--muted);height:100%;justify-content:flex-end}
+.bars .b i{width:100%;border-radius:5px 5px 2px 2px;background:var(--sea-2);min-height:2px}
+.bars .b.best i{background:var(--accent)}
+.bars .b em{font-style:normal;font-family:var(--font-data);color:var(--fg);font-size:11px}
+/* record */
+.photo{border:2px dashed var(--line);border-radius:14px;aspect-ratio:4/3;max-width:100%;display:grid;place-items:center;text-align:center;color:var(--muted);cursor:pointer;position:relative;overflow:hidden;background:var(--card)}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo input{position:absolute;inset:0;opacity:0;cursor:pointer}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{font:inherit;font-size:14px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;box-sizing:border-box}
+textarea{min-height:64px;resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.auto{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.auto .stat{padding:8px}
+.auto .stat b{font-size:13.5px}
+.list{display:flex;flex-direction:column}
+.list .it{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.list .it:first-child{border-top:0}
+.thumb{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;font-size:13px;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th,table.t td{text-align:left;padding:8px 4px;border-top:1px solid var(--line)}
+table.t th{color:var(--muted);font-weight:700;font-size:11.5px;border-top:0}
+.note{font-size:11.5px;color:var(--muted);line-height:1.5}
+.sample{font-size:10.5px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.copybox{font-family:var(--font-data);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;user-select:all}
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="logo"><span class="float" aria-hidden="true"></span>낚시 족보</div>
+    <div class="row" style="gap:10px;flex-wrap:nowrap"><div class="chip-live" id="liveChip"><i></i><span id="liveText">실시간</span></div><button class="lvl" id="lvlChip" aria-label="내 레벨 보기"><span class="badge" id="lvlNum">1</span><span id="lvlName">입문</span><span class="xpbar"><i id="lvlBar" style="width:0%"></i></span></button></div>
+  </header>
+  <main id="main">
+    <section class="view on" id="v-map" aria-label="지도"></section>
+    <section class="view" id="v-sea" aria-label="바다 정보"></section>
+    <section class="view" id="v-rec" aria-label="기록하기"></section>
+    <section class="view" id="v-jokbo" aria-label="족보"></section>
+    <section class="view" id="v-more" aria-label="나"></section>
+  </main>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-v="map" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>지도</button>
+    <button role="tab" data-v="sea" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 19c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/><circle cx="17" cy="6" r="3"/></svg>바다 정보</button>
+    <button role="tab" data-v="rec" aria-selected="false" class="rec"><span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></span>기록</button>
+    <button role="tab" data-v="jokbo" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>족보</button>
+    <button role="tab" data-v="more" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>나</button>
+  </nav>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SPECIES={
+  '감성돔':'#3a6ea5','볼락':'#8a5cc2','고등어':'#1f9d8b','갈치':'#9aa7ad','무늬오징어':'#e0794a','우럭':'#6b7a3a','학꽁치':'#c9a227'
+};
+const TIDES=['조금','무시','1물','2물','3물','4물','5물','6물','7물','8물','9물','10물','11물','12물','13물'];
+const POINTS=[
+ {id:'p1',name:'송정 방파제',type:'방파제',x:268,y:212,
+  amen:{toilet:['공중화장실','방파제 입구 120m'],food:['바다횟집','280m','21:00'],food2:['송정 해장국','350m','15:00'],shop:['송정낚시','150m','19:00'],park:['공영주차장','90m · 1시간 1,000원']}},
+ {id:'p2',name:'청사포 갯바위',type:'갯바위',x:212,y:300,
+  amen:{toilet:['공중화장실','포구 앞 200m'],food:['청사포 조개구이','240m','23:00'],food2:['포구 카페','180m','20:00'],shop:['청사포 미끼','210m','18:00'],park:['포구 주차장','150m · 무료']}},
+ {id:'p3',name:'대변항 방파제',type:'방파제',x:304,y:96,
+  amen:{toilet:['개방화장실','수협 위판장 90m'],food:['대변 멸치쌈밥','320m','20:30'],food2:['기장 곰장어','410m','22:00'],shop:['대변낚시마트','130m','24시간'],park:['항구 주차장','60m · 무료']}},
+ {id:'p4',name:'오륙도 선상',type:'선상',x:150,y:452,
+  amen:{toilet:['선착장 화장실','용호부두 출항지'],food:['용호 횟집거리','400m','22:00'],food2:['선착장 매점','50m','17:00'],shop:['용호낚시','300m','05:00 개점'],park:['용호부두 주차장','100m · 유료']}},
+ {id:'p5',name:'일광 해변',type:'해변 원투',x:296,y:150,
+  amen:{toilet:['공중화장실','해변 중앙 80m'],food:['일광 칼국수','260m','16:00'],food2:['해변 치킨','190m','01:00'],shop:['일광낚시','340m','20:00'],park:['해변 공영주차장','70m · 무료']}}
+];
+// sample catches (예시)
+let CATCHES=[
+ ['p1','2026-11-21','06:10','감성돔',2,38,'반유동 찌채비','크릴','7물',16.8,3.1],
+ ['p1','2026-11-14','05:40','감성돔',1,42,'반유동 찌채비','크릴','6물',17.4,2.4],
+ ['p1','2026-11-07','18:30','볼락',6,19,'볼락 루어 1.5g','웜','11물',18.1,1.8],
+ ['p1','2026-10-26','06:20','감성돔',3,35,'반유동 찌채비','크릴','7물',19.6,2.0],
+ ['p1','2026-10-12','17:50','고등어',14,28,'카드채비','곤쟁이','5물',21.2,3.5],
+ ['p2','2026-11-18','19:20','무늬오징어',2,24,'에깅 3.0호','에기','4물',18.0,2.6],
+ ['p2','2026-11-02','20:10','무늬오징어',3,22,'에깅 3.0호','에기','8물',19.0,1.9],
+ ['p2','2026-10-19','05:50','감성돔',1,33,'전유동 찌채비','크릴','7물',20.4,2.2],
+ ['p2','2026-11-10','21:00','볼락',8,18,'볼락 루어 1g','웜','13물',17.9,1.2],
+ ['p3','2026-11-20','19:40','갈치',5,85,'갈치 텐야','꽁치살','9물',17.0,2.8],
+ ['p3','2026-11-11','20:15','갈치',7,90,'갈치 찌채비','꽁치살','10물',17.6,2.1],
+ ['p3','2026-10-28','07:10','고등어',20,27,'카드채비','곤쟁이','3물',20.1,3.0],
+ ['p3','2026-11-04','06:30','학꽁치',12,30,'학꽁치 찌채비','곤쟁이','2물',18.8,2.5],
+ ['p4','2026-11-16','07:30','우럭',9,32,'선상 외수질','미꾸라지','5물',17.2,4.2],
+ ['p4','2026-11-09','08:00','우럭',6,35,'선상 외수질','미꾸라지','6물',17.8,3.4],
+ ['p4','2026-10-30','09:10','감성돔',1,45,'선상 찌채비','크릴','7물',19.5,2.9],
+ ['p5','2026-11-19','06:00','감성돔',1,36,'원투 채비','갯지렁이','7물',16.9,2.0],
+ ['p5','2026-11-03','16:40','학꽁치',9,29,'학꽁치 찌채비','곤쟁이','4물',18.5,2.2]
+].map((r,i)=>({id:'c'+i,pt:r[0],date:r[1],time:r[2],sp:r[3],n:r[4],cm:r[5],rig:r[6],bait:r[7],tide:r[8],temp:r[9],wind:r[10],sample:true}));
+try{const saved=JSON.parse(localStorage.getItem('jokbo-mine')||'[]');if(Array.isArray(saved))CATCHES=saved.concat(CATCHES);}catch(e){}
+let SKUNK=[{pt:'p1',date:'2026-11-17'},{pt:'p2',date:'2026-11-12'},{pt:'p5',date:'2026-11-08'},{pt:'p3',date:'2026-10-22'},{pt:'p1',date:'2026-10-05'}];
+let MANUAL=[{sp:'감성돔',cm:48,date:'2025-12-03',place:'거제 지세포 갯바위',sample:true}];
+let SESSION=null,BONUS=0;try{BONUS=+localStorage.getItem('jokbo-bonus')||0}catch(e){}
+try{const m=JSON.parse(localStorage.getItem('jokbo-records')||'[]');if(Array.isArray(m))MANUAL=m.concat(MANUAL);const k=JSON.parse(localStorage.getItem('jokbo-skunk')||'[]');if(Array.isArray(k))SKUNK=k.concat(SKUNK);}catch(e){}
+function saveExtra(){try{localStorage.setItem('jokbo-records',JSON.stringify(MANUAL.filter(r=>!r.sample)));localStorage.setItem('jokbo-skunk',JSON.stringify(SKUNK.filter(r=>r.mine)));}catch(e){}}
+function visits(){const m=new Map();CATCHES.forEach(c=>m.set(c.pt+'|'+c.date,{pt:c.pt,date:c.date,caught:true}));SKUNK.forEach(k=>{const key=k.pt+'|'+k.date;if(!m.has(key))m.set(key,{pt:k.pt,date:k.date,caught:false})});return [...m.values()]}
+function saveMine(){try{localStorage.setItem('jokbo-mine',JSON.stringify(CATCHES.filter(c=>!c.sample).map(c=>({...c,photo:null}))));}catch(e){}}
+
+// live conditions (prototype: simulated drift)
+const live={temp:16.8,air:12.4,wind:3.1,windDir:'북동',wave:0.6,tideIdx:8,updated:new Date()};
+function tick(){live.temp=+(live.temp+(Math.random()-.5)*.1).toFixed(1);live.air=+(live.air+(Math.random()-.5)*.3).toFixed(1);live.wind=Math.max(.5,+(live.wind+(Math.random()-.5)*.4).toFixed(1));live.wave=Math.max(.2,+(live.wave+(Math.random()-.5)*.06).toFixed(1));live.updated=new Date();renderLiveBits();}
+setInterval(tick,20000);
+function hhmm(d){return d.toTimeString().slice(0,5)}
+function agoText(){const s=Math.round((Date.now()-live.updated)/1000);return s<10?'방금 갱신':s+'초 전 갱신'}
+setInterval(()=>{document.querySelectorAll('[data-ago]').forEach(e=>e.textContent=agoText())},1000);
+
+// helpers
+const ptById=id=>POINTS.find(p=>p.id===id);
+function topSpecies(pt){const m={};CATCHES.filter(c=>c.pt===pt).forEach(c=>m[c.sp]=(m[c.sp]||0)+c.n);return Object.entries(m).sort((a,b)=>b[1]-a[1]);}
+function bestRig(pt,sp){const m={};CATCHES.filter(c=>c.pt===pt&&c.sp===sp).forEach(c=>m[c.rig]=(m[c.rig]||0)+c.n);const e=Object.entries(m).sort((a,b)=>b[1]-a[1])[0];return e?e[0]:'-'}
+function bestTide(sp,pt){const m={};CATCHES.filter(c=>c.sp===sp&&(!pt||c.pt===pt)).forEach(c=>m[c.tide]=(m[c.tide]||0)+c.n);const e=Object.entries(m).sort((a,b)=>b[1]-a[1])[0];return e?e[0]:'-'}
+function bestHour(sp,pt){const m={};CATCHES.filter(c=>c.sp===sp&&(!pt||c.pt===pt)).forEach(c=>{const h=+c.time.slice(0,2);const k=h<9?'새벽~아침':h<16?'낮':h<19?'해질녘':'밤';m[k]=(m[k]||0)+c.n});const e=Object.entries(m).sort((a,b)=>b[1]-a[1])[0];return e?e[0]:'-'}
+function openStatus(close){if(close==='24시간')return['open','영업 중 · 24시간'];if(/개점/.test(close))return['closed',close];const now=new Date();const [h,m]=close.split(':').map(Number);let c=new Date(now);c.setHours(h,m,0,0);if(h<5)c.setDate(c.getDate()+1);const diff=(c-now)/60000;if(diff<0)return['closed',close+' 영업 종료'];if(diff<=60)return['soon',close+' 종료 · '+Math.round(diff)+'분 남음'];return['open',close+'까지 영업'];}
+
+// ---------- SESSION (낚시 히스토리) ----------
+function sessCatches(){return SESSION?CATCHES.filter(c=>!c.sample&&+c.id.slice(1)>=SESSION.start):[]}
+function updSess(){const e=document.getElementById('sessTime');if(!e||!SESSION)return;const t=Math.floor((Date.now()-SESSION.start)/1000);e.textContent=[t/3600,t%3600/60,t%60].map(x=>String(Math.floor(x)).padStart(2,'0')).join(':')}
+setInterval(updSess,1000);
+function startSession(){SESSION={pt:'p1',start:Date.now()};try{sessionStorage.setItem('jokbo-sess',JSON.stringify(SESSION))}catch(e){}renderMap();
+  const v=visits().filter(x=>x.pt==='p1');toast('출조를 시작했어요','송정 방파제 '+(v.length+1)+'번째 방문 · 위치와 시간을 자동으로 기록해요. 잡으면 [기록]을 누르세요.',null)}
+function endSession(){if(!SESSION)return;const cs=sessCatches();const p=ptById(SESSION.pt);const mins=Math.max(1,Math.round((Date.now()-SESSION.start)/60000));const d=new Date().toISOString().slice(0,10);
+  const before=stats();BONUS+=30;try{localStorage.setItem('jokbo-bonus',BONUS)}catch(e){}if(!cs.length)SKUNK.unshift({pt:SESSION.pt,date:d,mine:true});saveExtra();SESSION=null;try{sessionStorage.removeItem('jokbo-sess')}catch(e){}
+  const after=renderLevel();const v=visits().filter(x=>x.pt===p.id);
+  showSheet(`<h2>출조 끝! 수고했어요</h2><p class="sub">${esc(p.name)} · ${mins}분 · ${v.length}번째 방문</p>
+   <div class="grid2"><div class="stat"><b>${cs.reduce((s,c)=>s+c.n,0)}마리</b><span>이번 조과</span></div><div class="stat"><b>+${after.xp-before.xp} XP</b><span>출조 완료 보상</span></div></div>
+   ${cs.length?`<div class="list">${cs.map(itemHTML).join('')}</div>`:`<div class="jokbo-line">이번엔 꽝이었어요. 꽝도 족보예요. 이 조건에선 안 나온다는 기록이 쌓여요.</div>`}
+   <p class="sub">이 포인트 누적: 방문 ${v.length}회 · 조과 있음 ${v.filter(x=>x.caught).length}회 · 꽝 ${v.filter(x=>!x.caught).length}회</p>
+   <button class="btn primary" id="sessDone">확인</button>`,()=>{$('#sessDone').onclick=()=>{closeSheet();renderMap()}});
+  xpFly(after.xp-before.xp);}
+try{const ss=JSON.parse(sessionStorage.getItem('jokbo-sess')||'null');if(ss&&ss.pt)SESSION=ss}catch(e){}
+
+// ---------- MAP ----------
+let mapFilter='전체',mapMode='2d';
+function renderMap(){
+  const species=['전체',...Object.keys(SPECIES)];
+  const pins=POINTS.map(p=>{
+    const ts=topSpecies(p.id);const main=ts[0]?ts[0][0]:null;
+    const show=mapFilter==='전체'||ts.some(t=>t[0]===mapFilter);
+    if(!show)return'';
+    const col=main?SPECIES[mapFilter==='전체'?main:mapFilter]:'#888';
+    const cnt=CATCHES.filter(c=>c.pt===p.id).length;
+    return `<g class="pin" tabindex="0" role="button" aria-label="${esc(p.name)} 열기" data-pt="${p.id}" transform="translate(${p.x} ${p.y})">
+      <path d="M0 0c-9-13-14-19-14-26a14 14 0 0 1 28 0c0 7-5 13-14 26Z" fill="${col}" stroke="#fff" stroke-width="2"/>
+      <circle cx="0" cy="-26" r="6" fill="#fff"/>
+      <text x="0" y="-22.5" text-anchor="middle" font-size="9" font-weight="700" fill="${col}" font-family="IBM Plex Mono,monospace">${cnt}</text>
+      <text x="18" y="-24" font-size="11.5" font-weight="700" fill="${mapMode==='sat'?'#fff':'var(--fg)'}" paint-order="stroke" stroke="${mapMode==='sat'?'rgba(0,0,0,.6)':'var(--water)'}" stroke-width="3">${esc(p.name)}</text>
+    </g>`}).join('');
+  const sat=mapMode==='sat',d3=mapMode==='3d';
+  const LAND='M400 0 L300 0 C 320 40 290 70 310 100 C 330 130 300 140 300 160 C 300 190 260 190 270 225 C 280 260 240 270 225 300 C 210 330 240 360 200 390 C 170 420 190 470 160 500 C 140 520 150 545 140 560 L400 560 Z';
+  const lc=sat?'#f4f1e6':'var(--muted)', sc=sat?'#cfe6f0':'var(--sea-2)', halo=sat?'rgba(0,0,0,.55)':'var(--land)';
+  const lbl=(x,y,t,sz,w,c,h)=>`<text x="${x}" y="${y}" font-size="${sz}" font-weight="${w}" fill="${c}" text-anchor="middle" paint-order="stroke" stroke="${h}" stroke-width="3">${t}</text>`;
+  const places=[[352,46,'기장군',13,900],[340,316,'해운대구',13,900],[300,524,'남구',13,900],[350,112,'대변항',10.5,500],[352,166,'일광해수욕장',10.5,500],[348,224,'송정해수욕장',10.5,500],[300,262,'구덕포',10.5,500],[262,298,'청사포',10.5,500],[246,338,'미포',10.5,500],[268,372,'해운대해수욕장',10.5,500],[226,406,'동백섬',10.5,500],[214,452,'광안리',10.5,500],[192,500,'이기대',10.5,500],[370,262,'장산 634m',10,500],[354,412,'센텀시티',10,500]];
+  $('#v-map').innerHTML=`<div class="mapwrap ${d3?'mode-3d':''}" id="mapwrap"><div class="tilt">
+   <svg class="map" viewBox="0 0 400 560" preserveAspectRatio="xMaxYMid slice" aria-label="내 포인트 지도, ${sat?'위성':d3?'3D':'2D'}">
+    <defs>
+     <radialGradient id="satSea" cx="70%" cy="40%" r="90%"><stop offset="0" stop-color="#1d5a72"/><stop offset=".5" stop-color="#103d52"/><stop offset="1" stop-color="#08263a"/></radialGradient>
+     <linearGradient id="satLand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4c6a3a"/><stop offset=".45" stop-color="#3d5a33"/><stop offset=".7" stop-color="#6b6a52"/><stop offset="1" stop-color="#7d7a66"/></linearGradient>
+     <pattern id="city" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="3" height="4" fill="#c9c6b8" opacity=".55"/><rect x="5" y="5" width="4" height="3" fill="#b8b3a2" opacity=".5"/></pattern>
+     <radialGradient id="hill"><stop offset="0" stop-color="#22381f"/><stop offset="1" stop-color="#3d5a33" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="400" height="560" fill="${sat?'url(#satSea)':'var(--water)'}"/>
+    ${sat?'':`<path d="M120 0 C 160 60 120 120 180 180 S 200 260 150 330 S 60 420 40 560" fill="none" stroke="var(--water-2)" stroke-width="40" opacity=".7"/>
+    <path d="M60 0 C 100 80 60 160 110 230 S 120 330 70 400 S 0 480 0 560" fill="none" stroke="var(--water-2)" stroke-width="30" opacity=".5"/>`}
+    ${d3?`<path d="${LAND}" transform="translate(-7 12)" fill="#00000030"/><path d="${LAND}" transform="translate(-3 6)" fill="${sat?'#2a3d24':'#bfb293'}"/>`:''}
+    <path d="${LAND}" fill="${sat?'url(#satLand)':'var(--land)'}" stroke="${sat?'#e8e2c8':'var(--land-line)'}" stroke-width="${sat?1:1.5}"/>
+    ${sat?`<path d="M300 300 L400 280 L400 560 L170 560 C 190 470 230 420 300 300Z" fill="url(#city)"/><ellipse cx="364" cy="250" rx="42" ry="34" fill="url(#hill)"/>`:''}
+    ${d3?`<g><path d="M330 262 L364 206 L398 262 Z" fill="${sat?'#3a5530':'#cbbf9f'}" stroke="${sat?'#24351f':'var(--land-line)'}"/><path d="M364 206 L398 262 L378 262 Z" fill="#00000026"/>${[[318,398,16],[334,392,26],[350,402,32],[366,388,20],[382,404,28],[300,432,14],[316,440,22]].map(([x,y,h])=>`<rect x="${x}" y="${y-h}" width="10" height="${h}" fill="${sat?'#d9d4c4':'#e2d8c0'}" stroke="${sat?'#8f8a78':'var(--land-line)'}" stroke-width=".6"/><rect x="${x+10}" y="${y-h+3}" width="4" height="${h-3}" fill="#00000026"/>`).join('')}</g>`:''}
+    <path d="M306 101 l-30 6 M272 222 l-26 4" stroke="${sat?'#e8e2c8':'var(--land-line)'}" stroke-width="5" stroke-linecap="round"/>
+    <g fill="${sat?'#5e7a46':'var(--land)'}" stroke="${sat?'#e8e2c8':'var(--land-line)'}"><circle cx="128" cy="486" r="5"/><circle cx="118" cy="498" r="4"/><circle cx="134" cy="504" r="3.5"/><circle cx="122" cy="514" r="3"/></g>
+    ${lbl(126,534,'오륙도',10.5,500,sc,sat?'rgba(0,0,0,.55)':'var(--water)')}
+    ${places.map(([x,y,t,sz,w])=>lbl(x,y,t,sz,w,lc,halo)).join('')}
+    ${lbl(90,110,'기장 앞바다',11,700,sc,sat?'rgba(0,0,0,.4)':'var(--water)')}
+    ${lbl(80,400,'남해 동부 앞바다',11,700,sc,sat?'rgba(0,0,0,.4)':'var(--water)')}
+    <text x="70" y="200" font-size="10" fill="${sc}" opacity=".8" font-family="IBM Plex Mono,monospace">수심 20m</text>
+    <text x="40" y="330" font-size="10" fill="${sc}" opacity=".8" font-family="IBM Plex Mono,monospace">수심 40m</text>
+    <circle cx="258" cy="250" r="7" fill="#2f7bf5" stroke="#fff" stroke-width="2.5"/><circle cx="258" cy="250" r="16" fill="#2f7bf5" opacity=".15"/>
+    ${pins}
+   </svg></div>
+   <div class="mapmode" role="group" aria-label="지도 종류">${[['2d','2D'],['sat','위성'],['3d','3D']].map(([k,t])=>`<button aria-pressed="${mapMode===k}" data-mode="${k}">${t}</button>`).join('')}</div>
+   <div class="map-filter" role="group" aria-label="어종으로 거르기">${species.map(s=>`<button class="pill" aria-pressed="${s===mapFilter}" data-f="${esc(s)}">${s!=='전체'?`<span class="dot" style="background:${SPECIES[s]}"></span>`:''}${esc(s)}</button>`).join('')}</div>
+   <div class="map-legend">예시 지도 · 핀 숫자 = 기록 수</div>
+   ${SESSION?`<div class="sessbar"><span class="rec" aria-hidden="true"></span><div><div style="font-size:11.5px;opacity:.85">출조 중 · ${esc(ptById(SESSION.pt).name)}</div><b id="sessTime">00:00:00</b> <span style="font-size:12px;opacity:.85">· 기록 ${sessCatches().length}건</span></div><button class="btn" id="sessRec" style="margin-left:auto;background:rgba(255,255,255,.15);color:#fff;border-color:transparent">기록</button><button class="btn primary" id="sessEnd" style="margin-left:0">종료</button></div>`:`<button class="startfab" id="sessStart"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 4v16l13-8Z"/></svg>출조 시작</button>`}
+   <button class="mylocate" id="saveHere" aria-label="지금 위치를 포인트로 저장" title="지금 위치를 포인트로 저장"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+  </div>`;
+  document.querySelectorAll('.map-filter .pill').forEach(b=>b.onclick=()=>{mapFilter=b.dataset.f;renderMap()});
+  document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mapMode=b.dataset.mode;renderMap()});
+  if($('#sessStart'))$('#sessStart').onclick=startSession;
+  if($('#sessEnd'))$('#sessEnd').onclick=endSession;
+  if($('#sessRec'))$('#sessRec').onclick=()=>{recPoint=SESSION.pt;go('rec')};
+  updSess();
+  document.querySelectorAll('.pin').forEach(g=>{g.onclick=()=>openPoint(g.dataset.pt);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openPoint(g.dataset.pt)}}});
+  $('#saveHere').onclick=()=>showSheet(`<h2>지금 위치를 포인트로 저장</h2><p class="sub">GPS 35.1704, 129.2012 · 정확도 8m (예시)</p>
+    <label class="f">포인트 이름<input type="text" id="newPtName" value="해운대 미포 방파제"></label>
+    <label class="f">장소 유형<select id="newPtType"><option>방파제</option><option>갯바위</option><option>선상</option><option>해변 원투</option><option>저수지</option><option>강</option></select></label>
+    <div class="row"><button class="btn primary" id="newPtOk" style="flex:1">저장</button></div>
+    <p class="note">실제 앱은 버튼 한 번에 현재 위치가 바로 저장되고, 이름은 나중에 붙여도 돼요.</p>`,()=>{$('#newPtOk').onclick=()=>{const name=$('#newPtName').value.trim()||'새 포인트';POINTS.push({id:'p'+Date.now(),name,type:$('#newPtType').value,x:255,y:246,amen:POINTS[0].amen});closeSheet();renderMap();toast('포인트를 저장했어요',name+' · 이제 여기서 잡은 걸 기록해 보세요',null)}});
+}
+
+function openPoint(id){
+  const p=ptById(id);const ts=topSpecies(id);const cs=CATCHES.filter(c=>c.pt===id).sort((a,b)=>b.date.localeCompare(a.date));
+  const total=ts.reduce((s,t)=>s+t[1],0);
+  const top=ts[0];
+  const a=p.amen;
+  const st=x=>{const [cls,txt]=openStatus(x);return `<span class="tag-open ${cls}">${txt}</span>`};
+  showSheet(`<div class="between"><div><h2>${esc(p.name)}</h2><div class="sub">${esc(p.type)} · 기록 ${cs.length}회 · 총 ${total}마리</div></div><span class="sample">예시</span></div>
+   ${top?`<div class="jokbo-line">족보 한 줄: 이 포인트에선 <b>${esc(top[0])}</b> 조과가 가장 많았어요. <b>${esc(bestRig(id,top[0]))}</b>, <b>${esc(bestTide(top[0],id))}</b> 전후, <b>${esc(bestHour(top[0],id))}</b>에 잘 됐어요.</div>`:''}
+   <div class="grid2">
+     <div class="stat"><b>${live.temp.toFixed(1)}°C</b><span>지금 수온 · <span data-ago>${agoText()}</span></span></div>
+     <div class="stat"><b>${TIDES[live.tideIdx]}</b><span>오늘 물때</span></div>
+   </div>
+   <div><h3>잡힌 어종 순위</h3><div class="rank">${ts.map((t,i)=>`<div class="r"><span class="n">${i+1}</span><div>${esc(t[0])}<div class="bar"><i style="width:${t[1]/ts[0][1]*100}%;background:${SPECIES[t[0]]}"></i></div></div><span class="n">${t[1]}마리</span></div>`).join('')||'<p class="sub">아직 기록이 없어요.</p>'}</div></div>
+   <div><h3>주변 편의시설</h3><div class="amen">
+     <div><span class="tag">화장실</span><span>${esc(a.toilet[0])}</span><span class="sub">${esc(a.toilet[1])}</span></div>
+     <div><span class="tag">식당</span><span>${esc(a.food[0])} <span class="sub">${esc(a.food[1])}</span></span>${st(a.food[2])}</div>
+     <div><span class="tag">식당</span><span>${esc(a.food2[0])} <span class="sub">${esc(a.food2[1])}</span></span>${st(a.food2[2])}</div>
+     <div><span class="tag">낚시점</span><span>${esc(a.shop[0])} <span class="sub">${esc(a.shop[1])}</span></span>${st(a.shop[2])}</div>
+     <div><span class="tag">주차</span><span>${esc(a.park[0])}</span><span class="sub">${esc(a.park[1])}</span></div>
+   </div></div>
+   <div><h3>최근 조과</h3><div class="list">${cs.slice(0,4).map(itemHTML).join('')}</div></div>
+   <div class="row"><button class="btn primary" style="flex:1" id="ptRec">여기서 기록하기</button><button class="btn" style="flex:1" id="ptShare">친구에게 보내기</button></div>`,
+  ()=>{$('#ptRec').onclick=()=>{closeSheet();recPoint=id;go('rec')};$('#ptShare').onclick=()=>shareSheet(p)});
+}
+function itemHTML(c){const p=ptById(c.pt);return `<div class="it"><div class="thumb" style="background:${SPECIES[c.sp]||'#888'}">${c.photo?`<img src="${c.photo}" alt="">`:esc(c.sp.slice(0,1))}</div><div><b>${esc(c.sp)} ${c.n}마리</b> <span class="sub">${c.cm}cm</span><div class="sub">${esc(p?p.name:'')} · ${c.date.slice(5).replace('-','.')} ${c.time} · ${esc(c.rig)}</div></div><div class="sub" style="text-align:right">${esc(c.tide)}<br>${c.temp}°C</div></div>`}
+
+function shareSheet(p){
+  const link='https://jokbo.app/p/'+p.id+'x7k2';
+  showSheet(`<h2>${esc(p.name)} 보내기</h2><p class="sub">받는 사람은 위치와 내가 고른 정보만 볼 수 있어요.</p>
+   <div class="seg" role="group" aria-label="위치 정확도"><button aria-pressed="true" data-acc="exact">정확한 위치</button><button aria-pressed="false" data-acc="rough">대략 500m</button></div>
+   <label class="row" style="font-size:13px"><input type="checkbox" id="incCatch"> 내 조과 기록도 같이 보내기</label>
+   <div class="copybox" id="shareLink">${link}</div>
+   <div class="row"><button class="btn primary" style="flex:1" id="copyLink">링크 복사</button></div>
+   <p class="note">실제 앱에서는 카카오톡·문자로 바로 보내기가 열려요. 동호회방 공유는 3차 기능이에요.</p>`,()=>{
+    document.querySelectorAll('[data-acc]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-acc]').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#shareLink').textContent=link+(b.dataset.acc==='rough'?'?r=500':'')});
+    $('#copyLink').onclick=()=>{const t=$('#shareLink').textContent;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('#copyLink').textContent='복사했어요'}).catch(()=>{const r=document.createRange();r.selectNodeContents($('#shareLink'));const s=getSelection();s.removeAllRanges();s.addRange(r);$('#copyLink').textContent='선택됨, 길게 눌러 복사'})};
+  });
+}
+
+// ---------- SHEET / TOAST ----------
+function showSheet(html,after){closeSheet();const bg=document.createElement('div');bg.className='sheet-bg';bg.onclick=closeSheet;const sh=document.createElement('div');sh.className='sheet';sh.setAttribute('role','dialog');sh.innerHTML='<div class="grab"></div>'+html;const host=$('#app');host.appendChild(bg);host.appendChild(sh);if(after)after();}
+function closeSheet(){document.querySelectorAll('.sheet,.sheet-bg').forEach(e=>e.remove())}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
+function toast(title,body,onTap){document.querySelectorAll('.toast').forEach(e=>e.remove());const t=document.createElement('div');t.className='toast';t.innerHTML=`<span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg></span><div><strong>${esc(title)}</strong><p>${body}</p></div><button class="x" aria-label="닫기">×</button>`;t.querySelector('.x').onclick=e=>{e.stopPropagation();t.remove()};t.onclick=()=>{t.remove();if(onTap)onTap()};$('#main').appendChild(t);setTimeout(()=>t.remove(),12000);}
+
+// ---------- SEA ----------
+let seaPt='p1';
+function tideSVG(){
+  // semidiurnal curve, period 12.42h, for today
+  const W=360,H=120,pad=22;const now=new Date();const hNow=now.getHours()+now.getMinutes()/60;
+  const lvl=h=>Math.cos((h-4.3)/12.42*2*Math.PI);
+  let d='';for(let h=0;h<=24;h+=.25){const x=pad+h/24*(W-2*pad);const y=H/2-lvl(h)*(H/2-20);d+=(h?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}
+  const pts=[];for(let h=0;h<24;h+=.05){const a=lvl(h),b=lvl(h-.05),c=lvl(h+.05);if(a>b&&a>=c)pts.push([h,'만조']);if(a<b&&a<=c)pts.push([h,'간조'])}
+  const fmt=h=>String(Math.floor(h)).padStart(2,'0')+':'+String(Math.round((h%1)*60)%60).padStart(2,'0');
+  const xN=pad+hNow/24*(W-2*pad),yN=H/2-lvl(hNow)*(H/2-20);
+  return `<svg viewBox="0 0 ${W} ${H+18}" role="img" aria-label="오늘 조석 곡선">
+   <path d="${d} L${W-pad} ${H} L${pad} ${H} Z" fill="var(--water)"/><path d="${d}" fill="none" stroke="var(--sea-2)" stroke-width="2"/>
+   ${pts.map(([h,k])=>{const x=pad+h/24*(W-2*pad),y=H/2-lvl(h)*(H/2-20);return `<circle cx="${x}" cy="${y}" r="3" fill="var(--sea-2)"/><text x="${x}" y="${k==='만조'?y-8:y+15}" text-anchor="middle" font-size="10" fill="var(--fg)" font-family="IBM Plex Mono,monospace">${k} ${fmt(h)}</text>`}).join('')}
+   <line x1="${xN}" x2="${xN}" y1="6" y2="${H}" stroke="var(--accent)" stroke-dasharray="3 3"/><circle cx="${xN}" cy="${yN}" r="5" fill="var(--accent)" stroke="#fff" stroke-width="2"/>
+   ${[0,6,12,18,24].map(h=>`<text x="${pad+h/24*(W-2*pad)}" y="${H+14}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${String(h).padStart(2,'0')}시</text>`).join('')}
+  </svg>`;
+}
+function fishScore(){ // simple bite index from tide + wind + temp (prototype)
+  const t=live.tideIdx;const tideS=(t>=6&&t<=10)?40:(t>=4&&t<=12)?28:15;const windS=live.wind<4?30:live.wind<7?18:5;const tempS=live.temp>15&&live.temp<20?30:18;return Math.min(100,tideS+windS+tempS)}
+function renderSea(){
+  const p=ptById(seaPt);const sc=fishScore();
+  $('#v-sea').innerHTML=`
+   <div class="between"><div><h2>${esc(p.name)}</h2><div class="updated"><span class="spin"></span><span data-ago>${agoText()}</span> · 20초마다 자동 갱신</div></div>
+   <select id="seaSel" style="width:auto">${POINTS.map(x=>`<option value="${x.id}" ${x.id===seaPt?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+   <div class="alert"><b>풍랑 예비특보</b><span>내일 새벽부터 남해동부 앞바다 파고 2~3m 예상. 갯바위 출조 주의.</span></div>
+   <div class="card"><div class="between"><h3 style="margin:0">오늘 낚시 지수</h3><span class="sample">예시 계산</span></div>
+     <div class="row" style="margin-top:8px;align-items:flex-end"><b style="font-family:var(--font-data);font-size:38px;line-height:1;color:${sc>=75?'var(--good)':sc>=55?'var(--warn)':'var(--crit)'}" id="score">${sc}</b><span class="sub" style="padding-bottom:5px">/ 100 · ${sc>=75?'출조 추천':sc>=55?'무난':'쉬어가기'}</span></div>
+     <p class="note" style="margin:6px 0 0">물때 ${TIDES[live.tideIdx]}, 풍속, 수온을 반영했어요. 2차에서는 내 족보와 어종별 입질 확률을 더해요.</p></div>
+   <div class="cond">
+     <div class="stat"><b id="c-temp">${live.temp.toFixed(1)}°</b><span>수온</span></div>
+     <div class="stat"><b id="c-wind">${live.wind.toFixed(1)}</b><span>풍속 m/s · ${live.windDir}</span></div>
+     <div class="stat"><b id="c-wave">${live.wave.toFixed(1)}</b><span>파고 m</span></div>
+     <div class="stat"><b id="c-air">${live.air.toFixed(1)}°</b><span>기온</span></div>
+     <div class="stat"><b>${TIDES[live.tideIdx]}</b><span>물때</span></div>
+     <div class="stat"><b>07:12</b><span>일출 · 일몰 17:14</span></div>
+   </div>
+   <div class="card tide"><h3>오늘 조석</h3>${tideSVG()}</div>
+   <div class="card"><h3>시간대별 예보</h3><table class="t"><tr><th>시간</th><th>날씨</th><th>풍속</th><th>파고</th></tr>
+     ${[['06시','맑음','2.4','0.5'],['09시','맑음','3.0','0.6'],['12시','구름 조금','3.8','0.7'],['15시','구름 많음','4.6','0.9'],['18시','흐림','5.9','1.2'],['21시','흐림','7.2','1.6']].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td style="font-family:var(--font-data)">${r[2]}</td><td style="font-family:var(--font-data)">${r[3]}</td></tr>`).join('')}</table></div>
+   <p class="note">프로토타입이라 값은 예시예요. 실제 앱은 기상청 단기예보와 국립해양조사원 바다누리 데이터를 받아 자동으로 갱신해요.</p>`;
+  $('#seaSel').onchange=e=>{seaPt=e.target.value;renderSea()};
+}
+function renderLiveBits(){
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+  set('c-temp',live.temp.toFixed(1)+'°');set('c-wind',live.wind.toFixed(1));set('c-wave',live.wave.toFixed(1));set('c-air',live.air.toFixed(1)+'°');
+  const s=document.getElementById('score');if(s)s.textContent=fishScore();
+  $('#liveText').textContent='실시간 '+hhmm(live.updated);
+  const ad=document.querySelectorAll('.auto [data-k]');ad.forEach(e=>{const k=e.dataset.k;e.textContent=k==='temp'?live.temp.toFixed(1)+'°C':k==='wind'?live.wind.toFixed(1)+'m/s':k==='wave'?live.wave.toFixed(1)+'m':TIDES[live.tideIdx]});
+}
+
+// ---------- RECORD ----------
+let recPoint='p1',recSp='감성돔',recPhoto=null;
+function renderRec(){
+  const now=new Date();
+  $('#v-rec').innerHTML=`
+   <div><h2>조과 기록</h2><p class="sub" style="margin:4px 0 0">사진부터 찍으세요. 위치·시간·날씨·물때는 자동으로 붙어요.</p></div>
+   <label class="photo" id="photoBox">${recPhoto?`<img src="${recPhoto}" alt="조과 사진">`:`<span><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg><br><b>사진 찍기</b><br><span class="sub">또는 앨범에서 고르기</span></span>`}<input type="file" accept="image/*" capture="environment" id="photoIn" aria-label="조과 사진"></label>
+   <div class="card"><div class="between"><h3 style="margin:0">자동으로 붙는 정보</h3><span class="updated"><span class="spin"></span><span data-ago>${agoText()}</span></span></div>
+    <div class="auto" style="margin-top:8px"><div class="stat"><b data-k="tide">${TIDES[live.tideIdx]}</b><span>물때</span></div><div class="stat"><b data-k="temp">${live.temp.toFixed(1)}°C</b><span>수온</span></div><div class="stat"><b data-k="wind">${live.wind.toFixed(1)}m/s</b><span>풍속</span></div><div class="stat"><b data-k="wave">${live.wave.toFixed(1)}m</b><span>파고</span></div></div>
+    <p class="note" style="margin:8px 0 0">${now.getMonth()+1}월 ${now.getDate()}일 ${hhmm(now)} · GPS 위치</p></div>
+   <label class="f">포인트<select id="recPt">${POINTS.map(p=>`<option value="${p.id}" ${p.id===recPoint?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+   <div class="f" style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:var(--muted)">어종 <span class="note" style="font-weight:400">사진으로 어종 자동 판별은 2차 기능이에요</span>
+    <div class="chips" role="group" aria-label="어종">${Object.keys(SPECIES).map(s=>`<button class="pill" aria-pressed="${s===recSp}" data-sp="${esc(s)}"><span class="dot" style="background:${SPECIES[s]}"></span>${esc(s)}</button>`).join('')}</div></div>
+   <div class="grid2"><label class="f">마릿수<input type="number" id="recN" value="1" min="1"></label><label class="f">최대 크기(cm)<input type="number" id="recCm" value="35" min="1"></label></div>
+   <div class="grid2"><label class="f">채비<input type="text" id="recRig" value="반유동 찌채비"></label><label class="f">미끼<input type="text" id="recBait" value="크릴"></label></div>
+   <label class="f">메모<textarea id="recMemo" placeholder="입질 패턴, 수심, 밑걸림 위치 등"></textarea></label>
+   <button class="btn primary" id="recSave">기록 저장</button>
+   <p class="note">내가 저장한 기록은 이 브라우저에만 남아요(프로토타입). 실제 앱은 계정에 저장되고 기기끼리 동기화돼요.</p>`;
+  $('#photoIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{recPhoto=r.result;renderRec()};r.readAsDataURL(f)};
+  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{recSp=b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+  $('#recPt').onchange=e=>recPoint=e.target.value;
+  $('#recSave').onclick=()=>{
+    const d=new Date();const c={id:'m'+Date.now(),pt:recPoint,date:d.toISOString().slice(0,10),time:hhmm(d),sp:recSp,n:Math.max(1,+$('#recN').value||1),cm:+$('#recCm').value||0,rig:$('#recRig').value.trim()||'-',bait:$('#recBait').value.trim()||'-',tide:TIDES[live.tideIdx],temp:live.temp,wind:live.wind,memo:$('#recMemo').value,photo:recPhoto,sample:false};
+    const before=stats();CATCHES.unshift(c);saveMine();recPhoto=null;const after=renderLevel();xpFly(after.xp-before.xp);if(after.lv>before.lv)setTimeout(()=>toast('레벨 업! Lv.'+after.lv+' '+LV[after.lv-1],'계속 기록하면 다음 배지가 열려요',()=>go('more')),1600);
+    toast('기록을 저장했어요',`${esc(c.sp)} ${c.n}마리 · ${esc(ptById(c.pt).name)} · 족보에 바로 반영됐어요`,()=>go('jokbo'));
+    go(SESSION?'map':'jokbo');
+  };
+}
+
+// ---------- JOKBO ----------
+let jkSp='감성돔',jkMode='species';
+function renderJokbo(){
+  const sps=Object.keys(SPECIES).filter(s=>CATCHES.some(c=>c.sp===s));
+  if(!sps.includes(jkSp))jkSp=sps[0];
+  const cs=CATCHES.filter(c=>c.sp===jkSp);
+  const byPt={};cs.forEach(c=>byPt[c.pt]=(byPt[c.pt]||0)+c.n);const ptRank=Object.entries(byPt).sort((a,b)=>b[1]-a[1]);
+  const groups=[['조금~3물',['조금','무시','1물','2물','3물']],['4~6물',['4물','5물','6물']],['7~9물',['7물','8물','9물']],['10~13물',['10물','11물','12물','13물']]];
+  const gv=groups.map(([k,arr])=>[k,cs.filter(c=>arr.includes(c.tide)).reduce((s,c)=>s+c.n,0)]);const gmax=Math.max(1,...gv.map(g=>g[1]));
+  const hours=[['새벽',0,7],['아침',7,10],['낮',10,16],['해질녘',16,19],['밤',19,24]];
+  const hv=hours.map(([k,a,b])=>[k,cs.filter(c=>{const h=+c.time.slice(0,2);return h>=a&&h<b}).reduce((s,c)=>s+c.n,0)]);const hmax=Math.max(1,...hv.map(g=>g[1]));
+  const temps=cs.map(c=>c.temp);const tmin=Math.min(...temps),tmax=Math.max(...temps);
+  const rigs={};cs.forEach(c=>rigs[c.rig]=(rigs[c.rig]||0)+c.n);const rigRank=Object.entries(rigs).sort((a,b)=>b[1]-a[1]);
+  const bestPt=ptRank[0]?ptById(ptRank[0][0]):null;
+  const bars=(arr,max)=>{const best=Math.max(...arr.map(a=>a[1]));return `<div class="bars">${arr.map(([k,v])=>`<div class="b ${v===best&&v>0?'best':''}"><em>${v}</em><i style="height:${v/max*80}%"></i>${k}</div>`).join('')}</div>`};
+  const pointView=()=>POINTS.map(p=>{const ts=topSpecies(p.id);if(!ts.length)return'';return `<div class="card"><div class="between"><b>${esc(p.name)}</b><span class="sub">${esc(p.type)}</span></div><div class="chips" style="margin-top:8px">${ts.map(t=>`<span class="pill"><span class="dot" style="background:${SPECIES[t[0]]}"></span>${esc(t[0])} ${t[1]}</span>`).join('')}</div></div>`}).join('');
+  $('#v-jokbo').innerHTML=`
+   <div class="between"><h2>나의 족보</h2><span class="sub">기록 ${CATCHES.length}건 · <span class="sample">예시 포함</span></span></div>
+   <div class="seg" role="group" aria-label="보기"><button aria-pressed="${jkMode==='species'}" data-m="species">어종별</button><button aria-pressed="${jkMode==='point'}" data-m="point">포인트별</button><button aria-pressed="${jkMode==='today'}" data-m="today">오늘 추천</button></div>
+   ${jkMode==='species'?`
+   <div class="chips" role="group" aria-label="어종">${sps.map(s=>`<button class="pill" aria-pressed="${s===jkSp}" data-js="${esc(s)}"><span class="dot" style="background:${SPECIES[s]}"></span>${esc(s)}</button>`).join('')}</div>
+   ${bestPt?`<div class="jokbo-line"><b>${esc(jkSp)}</b>은 <b>${esc(bestPt.name)}</b>에서 가장 많이 잡혔고, <b>${esc(rigRank[0][0])}</b>가 잘 먹혔어요. 수온 <b>${tmin.toFixed(1)}~${tmax.toFixed(1)}°C</b> 사이에 나왔어요. <span class="sub">(기록 ${cs.length}회 기준)</span></div>`:''}
+   <div class="card"><h3>잘 나온 포인트</h3><div class="rank">${ptRank.map(([id,v],i)=>`<div class="r"><span class="n">${i+1}</span><div>${esc(ptById(id).name)}<div class="bar"><i style="width:${v/ptRank[0][1]*100}%;background:${SPECIES[jkSp]}"></i></div></div><span class="n">${v}마리</span></div>`).join('')}</div></div>
+   <div class="card"><h3>물때별 마릿수</h3>${bars(gv,gmax)}</div>
+   <div class="card"><h3>시간대별 마릿수</h3>${bars(hv,hmax)}</div>
+   <div class="card"><h3>잘 된 채비</h3><div class="rank">${rigRank.map(([k,v],i)=>`<div class="r"><span class="n">${i+1}</span><span>${esc(k)}</span><span class="n">${v}마리</span></div>`).join('')}</div></div>
+   <div class="card"><h3>최근 기록</h3><div class="list">${cs.slice(0,6).map(itemHTML).join('')}</div></div>
+   `:jkMode==='point'?pointView():todayView()}
+  `;
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{jkMode=b.dataset.m;renderJokbo()});
+  document.querySelectorAll('[data-js]').forEach(b=>b.onclick=()=>{jkSp=b.dataset.js;renderJokbo()});
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{go('map');openPoint(b.dataset.open)});
+}
+function todayView(){
+  const tide=TIDES[live.tideIdx];const near=[tide,TIDES[live.tideIdx-1],TIDES[live.tideIdx+1]];
+  const sim=CATCHES.filter(c=>near.includes(c.tide)&&Math.abs(c.temp-live.temp)<2.5);
+  const m={};sim.forEach(c=>{const k=c.pt+'|'+c.sp;m[k]=(m[k]||0)+c.n});
+  const rec=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  return `<div class="card"><h3>오늘 조건</h3><p class="sub" style="margin:0">물때 ${tide} · 수온 ${live.temp.toFixed(1)}°C · 풍속 ${live.wind.toFixed(1)}m/s</p></div>
+   <p class="sub" style="margin:0">오늘과 물때·수온이 비슷했던 날 ${sim.length}번의 기록에서 골랐어요.</p>
+   ${rec.map(([k,v],i)=>{const [pt,sp]=k.split('|');const p=ptById(pt);return `<div class="card"><div class="between"><div><span class="n" style="font-family:var(--font-data);color:var(--muted)">${i+1}</span> <b>${esc(p.name)}</b> · ${esc(sp)}</div><span class="sub">${v}마리</span></div>
+     <p class="sub" style="margin:6px 0 10px">${esc(bestRig(pt,sp))} · ${esc(bestHour(sp,pt))}에 잘 됐어요</p><button class="btn" data-open="${pt}">포인트 보기</button></div>`}).join('')||'<p class="sub">비슷한 조건의 기록이 아직 없어요.</p>'}
+   <p class="note">2차에서는 입질 예보와 모두의 족보를 더해 추천이 더 정확해져요.</p>`;
+}
+
+// ---------- ME (game) ----------
+const LV=['입문','손맛러','생활낚시인','출조꾼','조사','고수','꾼','명인','전설'];
+function stats(){
+  const trips=[...new Set(visits().map(v=>v.date))].sort();
+  const fish=CATCHES.reduce((s,c)=>s+c.n,0);
+  const pts=new Set(CATCHES.map(c=>c.pt)).size;
+  let xp=CATCHES.reduce((s,c)=>s+10+c.n*2+(c.cm>=40?20:0),0)+trips.length*30+pts*15+BONUS;
+  const lv=Math.min(9,Math.floor(Math.sqrt(xp/60))+1);
+  const cur=60*(lv-1)**2,next=60*lv**2;
+  const now=new Date();const ym=now.toISOString().slice(0,7);
+  const month=trips.filter(d=>d.startsWith(ym)).length;
+  const big=CATCHES.slice().sort((x,y)=>y.cm-x.cm)[0];
+  const wk=d=>Math.floor((Date.parse(d)/864e5+3)/7);const weeks=new Set(trips.map(wk));let streak=0,w=wk(now.toISOString().slice(0,10));if(!weeks.has(w))w--;while(weeks.has(w)){streak++;w--}
+  return {trips,fish,pts,xp,lv,cur,next,month,big,streak};
+}
+function renderLevel(){const st=stats();$('#lvlNum').textContent=st.lv;$('#lvlName').textContent=LV[st.lv-1];$('#lvlBar').style.width=(st.lv>=9?100:(st.xp-st.cur)/(st.next-st.cur)*100)+'%';return st}
+function fishIcon(c){return `<svg viewBox="0 0 44 22" aria-hidden="true"><path d="M4 11c6-8 18-9 28-3l8-5v16l-8-5c-10 6-22 5-28-3Z" fill="${c}"/><circle cx="11" cy="9.5" r="1.6" fill="#fff"/></svg>`}
+function xpFly(n){const e=document.createElement('div');e.className='xpfly';e.textContent='+'+n+' XP';$('#app').appendChild(e);setTimeout(()=>e.remove(),1500)}
+function renderMore(){
+  const st=renderLevel();
+  const pct=st.lv>=9?100:Math.round((st.xp-st.cur)/(st.next-st.cur)*100);
+  const now=new Date();const y=now.getFullYear(),m=now.getMonth();const first=new Date(y,m,1).getDay();const days=new Date(y,m+1,0).getDate();
+  const tripSet=new Set(st.trips);
+  const cal=Array.from({length:first},()=>'<span class="h"></span>').join('')+Array.from({length:days},(_,i)=>{const d=`${y}-${String(m+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;const big=CATCHES.some(c=>c.date===d&&c.cm>=40);return `<span class="${tripSet.has(d)?(big?'f2':'f'):''}" title="${tripSet.has(d)?'출조':''}">${i+1}</span>`}).join('');
+  const hm={};visits().forEach(v=>{const h=hm[v.pt]||(hm[v.pt]={name:ptById(v.pt)?ptById(v.pt).name:'-',v:0,c:0,last:''});h.v++;if(v.caught)h.c++;if(v.date>h.last)h.last=v.date});const hist=Object.values(hm).sort((a,b)=>b.v-a.v);
+  const rm={};CATCHES.forEach(c=>{if(!rm[c.sp]||c.cm>rm[c.sp].cm)rm[c.sp]={sp:c.sp,cm:c.cm,date:c.date,place:ptById(c.pt).name}});MANUAL.forEach(r=>{if(!rm[r.sp]||r.cm>rm[r.sp].cm)rm[r.sp]={...r,manual:true}});const recs=Object.values(rm).sort((a,b)=>b.cm-a.cm);
+  const LOCKED=['참돔','벵에돔','농어','광어','쥐노래미'];
+  const got=Object.keys(SPECIES).filter(s=>CATCHES.some(c=>c.sp===s));
+  const dex=[...Object.keys(SPECIES).map(s=>[s,got.includes(s),SPECIES[s]]),...LOCKED.map(s=>[s,false,'#9aa7ad'])];
+  const best=sp=>{const c=CATCHES.filter(x=>x.sp===sp).sort((a,b)=>b.cm-a.cm)[0];return c?c.cm+'cm':'미발견'};
+  const dawn=CATCHES.filter(c=>+c.time.slice(0,2)<7).length,night=CATCHES.filter(c=>+c.time.slice(0,2)>=19).length;
+  const B=[['첫 감성돔','감',CATCHES.some(c=>c.sp==='감성돔'),'#3a6ea5'],['40cm 돌파','40',CATCHES.some(c=>c.cm>=40&&c.sp!=='갈치'),'#ff6a2b'],['새벽형 꾼','새',dawn>=3,'#c9a227'],['포인트 개척자','5',st.pts>=5,'#1f9d8b'],['밤낚시 장인','밤',night>=5,'#8a5cc2'],['출조 10회','10',st.trips.length>=10,'#15536a'],['도감 10종','10',got.length>=10,'#6b7a3a'],['출조 50회','50',st.trips.length>=50,'#15536a'],['5짜 감성돔','50',CATCHES.some(c=>c.sp==='감성돔'&&c.cm>=50),'#d6453d']];
+  const wkAgo=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+  const wTrips=st.trips.filter(d=>d>=wkAgo).length,wBol=CATCHES.filter(c=>c.sp==='볼락'&&c.date>=wkAgo).reduce((s,c)=>s+c.n,0);
+  const Q=[['이번 주 출조 2회',wTrips,2,'+60 XP'],['이번 주 볼락 10마리',wBol,10,'+40 XP'],['새 어종 도감 등록',0,1,'+80 XP']];
+  $('#v-more').innerHTML=`
+   <div class="hero">
+     <svg class="ring" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="7"/><circle cx="36" cy="36" r="31" fill="none" stroke="#ffd36b" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(pct/100*194.8).toFixed(1)} 194.8" transform="rotate(-90 36 36)"/><text x="36" y="34" text-anchor="middle" font-size="10" fill="#fff" opacity=".8">Lv</text><text x="36" y="50" text-anchor="middle" font-size="20" font-weight="900" fill="#fff" font-family="IBM Plex Mono,monospace">${st.lv}</text></svg>
+     <div><small>나의 낚시 등급</small><h2>${LV[st.lv-1]}</h2><div class="xp"><i style="width:${pct}%"></i></div><small>${st.xp} XP · ${st.lv>=9?'최고 등급':'다음 등급 '+LV[st.lv]+'까지 '+(st.next-st.xp)+' XP'}</small></div>
+   </div>
+   <div class="trip">
+     <div class="stat"><b>${st.trips.length}</b><span>총 출조</span></div>
+     <div class="stat"><b>${st.month}</b><span>이번 달</span></div>
+     <div class="stat"><b>${st.fish}</b><span>총 마릿수</span></div>
+     <div class="stat"><b>${st.streak}주</b><span>연속 출조</span></div>
+   </div>
+   <div class="card"><div class="between"><h3 style="margin:0">장소별 낚시 히스토리</h3><span class="sub">출조 시작 기록 기준</span></div>
+     <table class="t" style="margin-top:6px"><tr><th>장소</th><th>방문</th><th>조과</th><th>꽝</th><th>마지막</th></tr>${hist.map(h=>`<tr><td>${esc(h.name)}</td><td style="font-family:var(--font-data)">${h.v}회</td><td style="font-family:var(--font-data);color:var(--good)">${h.c}회</td><td style="font-family:var(--font-data);color:var(--muted)">${h.v-h.c}회</td><td class="sub">${h.last.slice(5).replace('-','.')}</td></tr>`).join('')}</table></div>
+   <div class="card"><div class="between"><h3 style="margin:0">어종별 기록고기</h3><button class="btn" id="addRecord" style="padding:6px 10px;font-size:12px">직접 입력</button></div>
+     <div class="rank" style="margin-top:10px">${recs.map(r=>`<div class="r"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:${SPECIES[r.sp]||'#9aa7ad'}"></span><div><b>${esc(r.sp)}</b> <span class="sub">${esc(r.place)} · ${r.date.replace(/-/g,'.')}${r.manual?' · 직접 입력':''}</span></div><span style="font-family:var(--font-data);font-weight:700;font-size:15px">${r.cm}cm</span></div>`).join('')}</div></div>
+   <div class="card"><div class="between"><h3 style="margin:0">${m+1}월 출조 달력</h3><span class="sub"><span style="color:var(--accent);font-weight:700">■</span> 40cm 이상</span></div>
+     <div class="cal" style="margin-top:10px">${['일','월','화','수','목','금','토'].map(d=>`<span class="h" style="font-family:var(--font-body)">${d}</span>`).join('')}${cal}</div></div>
+   <div class="card"><div class="between"><h3 style="margin:0">주간 퀘스트</h3><span class="sub">월요일 초기화</span></div>
+     <div class="quest" style="margin-top:10px">${Q.map(([t,v,g,r])=>`<div class="q"><span>${t}</span><span class="sub">${Math.min(v,g)}/${g} · ${r}</span><div class="bar"><i style="width:${Math.min(100,v/g*100)}%;background:${v>=g?'var(--good)':'var(--accent)'}"></i></div></div>`).join('')}</div></div>
+   <div class="card"><div class="between"><h3 style="margin:0">어종 도감</h3><span class="sub">${got.length} / ${dex.length}종</span></div>
+     <div class="dex" style="margin-top:10px">${dex.map(([s,ok,c])=>`<div class="${ok?'':'lock'}">${fishIcon(ok?c:'#9aa7ad')}<b>${ok?esc(s):'???'}</b><span class="sub">${ok?best(s):'미발견'}</span></div>`).join('')}</div></div>
+   <div class="card"><div class="between"><h3 style="margin:0">배지</h3><span class="sub">${B.filter(b=>b[2]).length} / ${B.length}</span></div>
+     <div class="badges" style="margin-top:10px">${B.map(([t,i,ok,c])=>`<div class="${ok?'':'lock'}"><div class="m" style="background:${c}">${i}</div>${t}</div>`).join('')}</div></div>
+   ${st.big?`<div class="card"><h3>나의 최대어</h3><div class="list">${itemHTML(st.big)}</div></div>`:''}
+   <div class="card"><h3>금어기 · 포획 금지 체장 <span class="sample">예시</span></h3>
+    <table class="t"><tr><th>어종</th><th>금어기</th><th>금지 체장</th></tr>
+     <tr><td>감성돔</td><td>5.1 ~ 5.31</td><td>25cm 미만</td></tr>
+     <tr><td>참돔</td><td>-</td><td>24cm 미만</td></tr>
+     <tr><td>넙치(광어)</td><td>-</td><td>35cm 미만</td></tr>
+     <tr><td>주꾸미</td><td>5.11 ~ 8.31</td><td>-</td></tr>
+     <tr><td>대구</td><td>1.16 ~ 2.15</td><td>35cm 미만</td></tr></table>
+    <p class="note">실제 앱은 해양수산부 최신 고시로 갱신하고, 기록할 때 체장 미달이면 알려줘요.</p></div>
+   <div class="card"><h3>도착 알림 미리 보기</h3><p class="sub" style="margin:0 0 10px">저장한 포인트 근처에 가면 그 자리의 시즌 족보를 알려줘요.</p><button class="btn" id="demoArrive">송정 방파제 도착 알림 보기</button></div>
+   <div class="card"><h3>백업</h3><p class="sub" style="margin:0 0 10px">내 기록 ${CATCHES.filter(c=>!c.sample).length}건 · 이 브라우저에 저장됨</p>
+    <div class="row"><button class="btn" id="exportBtn">백업 텍스트 보기</button><button class="btn" id="clearBtn">내 기록 지우기</button></div><div id="backupOut"></div></div>
+   <p class="note">지도, 날씨, 편의시설 값은 모두 예시예요. 화면과 흐름을 먼저 확인하는 프로토타입이에요.</p>`;
+  $('#demoArrive').onclick=()=>{go('map');arrive()};
+  $('#addRecord').onclick=()=>showSheet(`<h2>기록고기 직접 입력</h2><p class="sub">앱을 쓰기 전에 잡은 최대어도 남겨 두세요.</p>
+    <label class="f">어종<select id="rSp">${[...Object.keys(SPECIES),...LOCKED].map(x=>`<option>${x}</option>`).join('')}</select></label>
+    <div class="grid2"><label class="f">크기(cm)<input type="number" id="rCm" value="50"></label><label class="f">날짜<input type="text" id="rDate" value="2025-12-03"></label></div>
+    <label class="f">장소<input type="text" id="rPlace" value="거제 지세포 갯바위"></label>
+    <button class="btn primary" id="rOk">기록고기 저장</button>`,()=>{$('#rOk').onclick=()=>{MANUAL.unshift({sp:$('#rSp').value,cm:+$('#rCm').value||0,date:$('#rDate').value||'',place:$('#rPlace').value||'',mine:true});saveExtra();closeSheet();renderMore();toast('기록고기를 저장했어요',esc($('#rSp')?'':'')+'어종별 기록에 반영됐어요',null)}});
+  $('#exportBtn').onclick=()=>{$('#backupOut').innerHTML=`<div class="copybox" style="margin-top:10px;max-height:160px;overflow:auto">${esc(JSON.stringify(CATCHES.filter(c=>!c.sample).map(c=>({...c,photo:c.photo?'(사진)':null}))))}</div>`};
+  $('#clearBtn').onclick=()=>{const b=$('#clearBtn');if(b.dataset.c){CATCHES=CATCHES.filter(c=>c.sample);saveMine();renderMore()}else{b.dataset.c='1';b.textContent='한 번 더 누르면 지워요'}};
+}
+
+function arrive(){
+  const id='p1',mm=String(new Date().getMonth()+1).padStart(2,'0');const ms={};CATCHES.filter(c=>c.pt===id&&c.date.slice(5,7)===mm).forEach(c=>ms[c.sp]=(ms[c.sp]||0)+c.n);
+  const top=(Object.entries(ms).sort((a,b)=>b[1]-a[1])[0]||topSpecies(id)[0])[0];
+  toast('송정 방파제에 도착했어요',`11월엔 <b>${top}</b> 확률이 높아요 · ${esc(bestRig(id,top))}, ${esc(bestTide(top,id))} 전후 ${esc(bestHour(top,id))}. 화장실 120m, 바다횟집 21:00까지.`,()=>openPoint(id));
+}
+
+// ---------- NAV ----------
+const R={map:renderMap,sea:renderSea,rec:renderRec,jokbo:renderJokbo,more:renderMore};
+function go(v){closeSheet();document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===v));document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));R[v]();$('#main').scrollTop=0;}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+renderMap();renderLiveBits();renderLevel();$('#lvlChip').onclick=()=>go('more');
+setTimeout(arrive,1500);
+})();
+</script>
