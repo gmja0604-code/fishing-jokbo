@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MapView, { Marker, type MapType } from 'react-native-maps';
 import Banner from '@/components/Banner';
 import Sheet from '@/components/Sheet';
+import WebMap, { type WebMapHandle } from '@/components/WebMap';
 import { Button, CatchRow, H2, Pill, s as ui, Stat, Sub, Tip } from '@/components/ui';
 import { distanceM, fmtDist } from '@/lib/geo';
 import { pointSummary, seasonTip } from '@/lib/jokbo';
@@ -24,6 +25,8 @@ const TYPES: PlaceType[] = ['방파제', '갯바위', '선상', '해변 원투',
 export default function MapScreen() {
   const store = useStore();
   const map = useRef<MapView>(null);
+  const webMap = useRef<WebMapHandle>(null);
+  const useWeb = Platform.OS === 'android';
   const [mode, setMode] = useState<'2d' | 'sat' | '3d'>('2d');
   const [filter, setFilter] = useState('전체');
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
@@ -79,6 +82,11 @@ export default function MapScreen() {
     [store.points, store.catches, filter],
   );
 
+  const webPins = useMemo(
+    () => visible.map(({ p, sum }) => ({ id: p.id, lat: p.lat, lng: p.lng, label: p.name, count: sum.recent.length, color: speciesColor(filter === '전체' ? sum.top ?? '' : filter) })),
+    [visible, filter],
+  );
+
   const myPosition = async () => {
     if (me) return me;
     const p = await Location.requestForegroundPermissionsAsync();
@@ -126,6 +134,19 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      {useWeb ? (
+        <WebMap
+          ref={webMap}
+          mode={mode}
+          me={me}
+          pins={webPins}
+          onMarkerPress={(id) => router.push(`/point/${id}`)}
+          onLongPress={(lat, lng) => {
+            setName('');
+            setNewPt({ lat, lng });
+          }}
+        />
+      ) : (
       <MapView
         ref={map}
         style={StyleSheet.absoluteFill}
@@ -150,6 +171,7 @@ export default function MapScreen() {
           />
         ))}
       </MapView>
+      )}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.filter} contentContainerStyle={{ gap: 6, paddingHorizontal: 10 }}>
         {['전체', ...Object.keys(SPECIES).filter((sp) => store.catches.some((c) => c.species === sp))].map((sp) => (
@@ -172,6 +194,7 @@ export default function MapScreen() {
           const pos = await myPosition();
           if (!pos) return;
           map.current?.animateCamera({ center: { latitude: pos.lat, longitude: pos.lng }, zoom: 15 }, { duration: 500 });
+          webMap.current?.flyTo(pos.lat, pos.lng);
           setName('');
           setNewPt(pos);
         }}>
