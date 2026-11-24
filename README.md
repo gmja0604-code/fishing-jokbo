@@ -68,3 +68,6 @@ src/components/     공용 UI
 npm run typecheck
 npm run lint
 ```
+
+
+국내 공식 데이터(바다누리·기상청·카카오)로 바꾸는 설계는 [docs/data-sources-plan.md](docs/data-sources-plan.md)에 있어요.

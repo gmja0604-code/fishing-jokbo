@@ -1,4 +1,5 @@
 export type PlaceType = '방파제' | '갯바위' | '선상' | '해변 원투' | '저수지' | '강' | '기타';
+export const PLACE_TYPES: PlaceType[] = ['방파제', '갯바위', '선상', '해변 원투', '저수지', '강', '기타'];
 
 export interface FishingPoint {
   id: string;

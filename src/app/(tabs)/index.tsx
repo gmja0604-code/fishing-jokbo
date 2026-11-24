@@ -9,18 +9,19 @@ import Sheet from '@/components/Sheet';
 import WebMap, { type WebMapHandle } from '@/components/WebMap';
 import { Button, CatchRow, H2, Pill, s as ui, Stat, Sub, Tip } from '@/components/ui';
 import { distanceM, fmtDist } from '@/lib/geo';
+import { computeStats } from '@/lib/game';
 import { pointSummary, seasonTip } from '@/lib/jokbo';
 import { SPECIES, speciesColor } from '@/lib/species';
 import { useStore } from '@/lib/store';
 import { C } from '@/lib/theme';
-import type { PlaceType } from '@/lib/types';
+import { PLACE_TYPES, type PlaceType } from '@/lib/types';
 
 const MODES: { key: '2d' | 'sat' | '3d'; label: string }[] = [
   { key: '2d', label: '2D' },
   { key: 'sat', label: '위성' },
   { key: '3d', label: '3D' },
 ];
-const TYPES: PlaceType[] = ['방파제', '갯바위', '선상', '해변 원투', '저수지', '강', '기타'];
+const TYPES = PLACE_TYPES;
 
 export default function MapScreen() {
   const store = useStore();
@@ -34,7 +35,7 @@ export default function MapScreen() {
   const [newPt, setNewPt] = useState<{ lat: number; lng: number; startAfter?: boolean } | null>(null);
   const [name, setName] = useState('');
   const [type, setType] = useState<PlaceType>('방파제');
-  const [summary, setSummary] = useState<{ pointId: string; mins: number; tripStart: string } | null>(null);
+  const [summary, setSummary] = useState<{ tripId: string; pointId: string; mins: number; tripStart: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const alerted = useRef(new Set<string>());
 
@@ -115,7 +116,7 @@ export default function MapScreen() {
     const t = store.activeTrip;
     if (!t) return;
     store.endTrip();
-    setSummary({ pointId: t.pointId, tripStart: t.startAt, mins: Math.max(1, Math.round((Date.now() - Date.parse(t.startAt)) / 60000)) });
+    setSummary({ tripId: t.id, pointId: t.pointId, tripStart: t.startAt, mins: Math.max(1, Math.round((Date.now() - Date.parse(t.startAt)) / 60000)) });
   };
 
   const savePoint = () => {
@@ -129,7 +130,12 @@ export default function MapScreen() {
   const elapsed = store.activeTrip ? Math.floor((now - Date.parse(store.activeTrip.startAt)) / 1000) : 0;
   const clock = [elapsed / 3600, (elapsed % 3600) / 60, elapsed % 60].map((x) => String(Math.floor(x)).padStart(2, '0')).join(':');
   const tripCatches = store.activeTrip ? store.catches.filter((c) => c.sessionId === store.activeTrip!.id) : [];
-  const sumCatches = summary ? store.catches.filter((c) => c.at >= summary.tripStart && c.pointId === summary.pointId && !c.sample) : [];
+  const sumCatches = summary ? store.catches.filter((c) => c.sessionId === summary.tripId) : [];
+  // 이번 출조로 늘어난 XP = 지금 XP − 이번 출조와 그 기록이 없었을 때의 XP (같은 날 두 번째 출조는 출조 XP가 다시 붙지 않는다)
+  const sumXp = summary
+    ? computeStats(store.points, store.trips, store.catches, store.bonusXp).xp -
+      computeStats(store.points, store.trips.filter((t) => t.id !== summary.tripId), store.catches.filter((c) => c.sessionId !== summary.tripId), store.bonusXp).xp
+    : 0;
   const sumVisits = summary ? store.trips.filter((t) => t.pointId === summary.pointId).length : 0;
 
   return (
@@ -247,7 +253,7 @@ export default function MapScreen() {
         </Sub>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Stat value={`${sumCatches.reduce((a, c) => a + c.count, 0)}마리`} label="이번 조과" />
-          <Stat value="+30 XP" label="출조 완료 보상" color={C.accent} />
+          <Stat value={`+${sumXp} XP`} label="이번 출조로 얻은 XP" color={C.accent} />
         </View>
         {sumCatches.length ? sumCatches.map((c) => <CatchRow key={c.id} c={c} place={store.pointName(c.pointId)} />) : <Tip>이번엔 꽝이었어요. 꽝도 족보예요. 이 조건에선 안 나온다는 기록이 쌓여요.</Tip>}
         <Button label="확인" primary onPress={() => setSummary(null)} />

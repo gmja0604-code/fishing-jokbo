@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { C } from '@/lib/theme';
@@ -77,8 +78,9 @@ export const Columns = ({ data }: { data: [string, number][] }) => {
   );
 };
 
+/** 누르면 기록 수정 화면이 열린다 */
 export const CatchRow = ({ c, place }: { c: Catch; place: string }) => (
-  <View style={s.catchRow}>
+  <Pressable style={s.catchRow} onPress={() => router.push({ pathname: '/record', params: { catchId: c.id } })} accessibilityLabel={`${c.species} 기록 수정`}>
     <View style={[s.thumb, { backgroundColor: speciesColor(c.species) }]}>
       {c.photoUri ? <Image source={{ uri: c.photoUri }} style={{ width: '100%', height: '100%' }} /> : <Text style={{ color: '#fff', fontWeight: '900' }}>{c.species.slice(0, 1)}</Text>}
     </View>
@@ -97,7 +99,7 @@ export const CatchRow = ({ c, place }: { c: Catch; place: string }) => (
       <Text style={s.sub}>{c.cond.tide}</Text>
       {c.cond.waterTemp != null ? <Text style={s.sub}>{c.cond.waterTemp.toFixed(1)}°C</Text> : null}
     </View>
-  </View>
+  </Pressable>
 );
 
 export const Tip = ({ children }: { children: React.ReactNode }) => <View style={s.tip}>{typeof children === 'string' ? <Text style={s.tipT}>{children}</Text> : children}</View>;

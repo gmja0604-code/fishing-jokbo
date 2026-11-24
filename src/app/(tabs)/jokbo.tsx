@@ -2,20 +2,31 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Button, Card, CatchRow, Columns, H2, H3, Pill, Rank, s as ui, Sub, Tip } from '@/components/ui';
-import { speciesSummary, todayPicks, pointSummary } from '@/lib/jokbo';
+import { placeHistory, speciesSummary, todayPicks, pointSummary } from '@/lib/jokbo';
 import { tideName } from '@/lib/lunar';
-import { SPECIES_LIST, speciesColor } from '@/lib/species';
+import { allSpecies, speciesColor } from '@/lib/species';
 import { useStore } from '@/lib/store';
 import { C } from '@/lib/theme';
 
 export default function JokboScreen() {
   const store = useStore();
   const [mode, setMode] = useState<'species' | 'point' | 'today'>('species');
-  const caught = SPECIES_LIST.filter((sp) => store.catches.some((c) => c.species === sp));
+  const caught = allSpecies(store.catches).filter((sp) => store.catches.some((c) => c.species === sp));
   const [sp, setSp] = useState(caught[0] ?? '감성돔');
   const sum = useMemo(() => speciesSummary(sp, store.catches), [sp, store.catches]);
   const today = useMemo(() => todayPicks(store.catches, tideName()), [store.catches]);
   const hasSample = store.catches.some((c) => c.sample);
+  // 포인트별: 마릿수만이 아니라 다녀온 날 중 손맛 본 날의 비율(성공률)도 함께 본다
+  const pointRows = useMemo(() => {
+    const hist = new Map(placeHistory(store.points, store.trips, store.catches).map((h) => [h.point.id, h]));
+    return store.points
+      .map((p) => {
+        const h = hist.get(p.id);
+        return { p, ps: pointSummary(p.id, store.catches), visits: h?.visits ?? 0, caught: h?.caught ?? 0, rate: h && h.visits ? h.caught / h.visits : 0 };
+      })
+      .filter((r) => r.visits > 0)
+      .sort((a, b) => b.rate - a.rate || b.ps.total - a.ps.total);
+  }, [store.points, store.trips, store.catches]);
 
   return (
     <ScrollView contentContainerStyle={ui.screen}>
@@ -70,21 +81,24 @@ export default function JokboScreen() {
         </>
       ) : null}
 
-      {mode === 'point'
-        ? store.points.map((p) => {
-            const ps = pointSummary(p.id, store.catches);
-            if (!ps.total) return null;
-            return (
-              <Card key={p.id}>
-                <H3 right={<Sub>{p.type}</Sub>}>{p.name}</H3>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {ps.species.map(([x, v]) => <Pill key={x} label={`${x} ${v}`} color={speciesColor(x)} />)}
-                </View>
-                <Button label="포인트 보기" onPress={() => router.push(`/point/${p.id}`)} />
-              </Card>
-            );
-          })
-        : null}
+      {mode === 'point' ? (
+        <>
+          <Sub>성공률 = 다녀온 날 중 한 마리라도 잡은 날의 비율. 높은 순서예요.</Sub>
+          {pointRows.map(({ p, ps, visits, caught: ok, rate }) => (
+            <Card key={p.id}>
+              <H3 right={<Sub>{p.type}</Sub>}>{p.name}</H3>
+              <View style={ui.row}>
+                <Text style={[ui.body, { fontWeight: '800', color: rate >= 0.5 ? C.good : C.warn }]}>성공률 {Math.round(rate * 100)}%</Text>
+                <Sub>방문 {visits}회 · 조과 {ok}회 · 꽝 {visits - ok}회 · {ps.total}마리</Sub>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {ps.species.map(([x, v]) => <Pill key={x} label={`${x} ${v}`} color={speciesColor(x)} />)}
+              </View>
+              <Button label="포인트 보기" onPress={() => router.push(`/point/${p.id}`)} />
+            </Card>
+          ))}
+        </>
+      ) : null}
 
       {mode === 'today' ? (
         <>

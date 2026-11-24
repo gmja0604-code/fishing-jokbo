@@ -1,7 +1,7 @@
 import type { Catch, FishingPoint, ManualRecord, Trip } from './types';
 import { tripDates } from './jokbo';
 import { hm, ymd } from './geo';
-import { SPECIES_LIST } from './species';
+import { allSpecies } from './species';
 
 export const LEVELS = ['입문', '손맛러', '생활낚시인', '출조꾼', '조사', '고수', '꾼', '명인', '전설'];
 
@@ -28,7 +28,7 @@ export function computeStats(points: FishingPoint[], trips: Trip[], catches: Cat
 }
 
 export function bestRecords(catches: Catch[], manual: ManualRecord[], pointName: (id: string) => string) {
-  const m: Record<string, { species: string; sizeCm: number; date: string; place: string; manual?: boolean }> = {};
+  const m: Record<string, { id?: string; species: string; sizeCm: number; date: string; place: string; manual?: boolean }> = {};
   catches.forEach((c) => {
     if (!m[c.species] || c.sizeCm > m[c.species].sizeCm) m[c.species] = { species: c.species, sizeCm: c.sizeCm, date: ymd(c.at), place: pointName(c.pointId) };
   });
@@ -57,17 +57,29 @@ export function badges(catches: Catch[], points: number, trips: number) {
 
 export function dex(catches: Catch[]) {
   const got = new Set(catches.map((c) => c.species));
-  return SPECIES_LIST.map((s) => ({ species: s, ok: got.has(s), best: Math.max(0, ...catches.filter((c) => c.species === s).map((c) => c.sizeCm)) }));
+  return allSpecies(catches).map((s) => ({ species: s, ok: got.has(s), best: Math.max(0, ...catches.filter((c) => c.species === s).map((c) => c.sizeCm)) }));
 }
 
-export function weeklyQuests(trips: Trip[], catches: Catch[]) {
-  const since = new Date(Date.now() - 7 * 864e5).toISOString();
-  const wTrips = tripDates(trips.filter((t) => t.startAt >= since), catches.filter((c) => c.at >= since)).length;
-  const wBol = catches.filter((c) => c.species === '볼락' && c.at >= since).reduce((s, c) => s + c.count, 0);
-  const newSp = new Set(catches.filter((c) => c.at >= since).map((c) => c.species)).size;
+/** 한국 시간 기준 이번 주 월요일 날짜(YYYY-MM-DD). 퀘스트 보상은 주마다 한 번 받는다. */
+export function weekStart(now = new Date()) {
+  const k = new Date(now.getTime() + 9 * 3600e3);
+  const dow = (k.getUTCDay() + 6) % 7; // 월=0
+  return new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate() - dow)).toISOString().slice(0, 10);
+}
+
+export function weeklyQuests(trips: Trip[], catches: Catch[], claims: string[] = [], now = new Date()) {
+  const wk = weekStart(now);
+  const inWeek = (iso: string) => ymd(iso) >= wk;
+  const wCatches = catches.filter((c) => inWeek(c.at));
+  const wTrips = tripDates(trips.filter((t) => inWeek(t.startAt)), wCatches).length;
+  const wBol = wCatches.filter((c) => c.species === '볼락').reduce((s, c) => s + c.count, 0);
+  const newSp = new Set(wCatches.map((c) => c.species)).size;
   return [
-    { title: '이번 주 출조 2회', value: wTrips, goal: 2, reward: '+60 XP' },
-    { title: '이번 주 볼락 10마리', value: wBol, goal: 10, reward: '+40 XP' },
-    { title: '이번 주 어종 3가지', value: newSp, goal: 3, reward: '+80 XP' },
-  ];
+    { id: 'trip2', title: '이번 주 출조 2회', value: wTrips, goal: 2, xp: 60 },
+    { id: 'bol10', title: '이번 주 볼락 10마리', value: wBol, goal: 10, xp: 40 },
+    { id: 'sp3', title: '이번 주 어종 3가지', value: newSp, goal: 3, xp: 80 },
+  ].map((q) => {
+    const key = `${wk}:${q.id}`;
+    return { ...q, key, reward: `+${q.xp} XP`, done: q.value >= q.goal, claimed: claims.includes(key) };
+  });
 }

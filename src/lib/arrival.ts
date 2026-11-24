@@ -38,6 +38,27 @@ if (!TaskManager.isTaskDefined(GEOFENCE_TASK)) {
   });
 }
 
+function regions(points: FishingPoint[]) {
+  // 안드로이드·iOS 모두 한 앱당 지오펜스는 최대 20곳. 최근 저장한 포인트를 우선한다
+  return [...points]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 20)
+    .map((p) => ({ identifier: p.id, latitude: p.lat, longitude: p.lng, radius: 300, notifyOnEnter: true, notifyOnExit: false }));
+}
+
+/** 알림이 켜져 있으면 지금 포인트 목록으로 다시 등록한다(권한을 새로 묻지 않음). 새 포인트 추가·삭제 뒤 호출 */
+export async function syncArrivalAlerts(points: FishingPoint[]) {
+  const bg = await Location.getBackgroundPermissionsAsync();
+  if (!bg.granted) return false;
+  const rs = regions(points);
+  if (!rs.length) {
+    await disableArrivalAlerts();
+    return true;
+  }
+  await Location.startGeofencingAsync(GEOFENCE_TASK, rs);
+  return true;
+}
+
 /** 켜기: 알림·위치(항상) 권한을 받고 포인트 최대 20곳을 등록한다 */
 export async function enableArrivalAlerts(points: FishingPoint[]): Promise<string | null> {
   const n = await Notifications.requestPermissionsAsync();
@@ -46,10 +67,8 @@ export async function enableArrivalAlerts(points: FishingPoint[]): Promise<strin
   if (!fg.granted) return '위치 권한이 필요해요.';
   const bg = await Location.requestBackgroundPermissionsAsync();
   if (!bg.granted) return '도착 알림은 위치 권한을 "항상 허용"으로 바꿔야 켜져요.';
-  await Location.startGeofencingAsync(
-    GEOFENCE_TASK,
-    points.slice(0, 20).map((p) => ({ identifier: p.id, latitude: p.lat, longitude: p.lng, radius: 300, notifyOnEnter: true, notifyOnExit: false })),
-  );
+  const rs = regions(points);
+  if (rs.length) await Location.startGeofencingAsync(GEOFENCE_TASK, rs);
   return null;
 }
 

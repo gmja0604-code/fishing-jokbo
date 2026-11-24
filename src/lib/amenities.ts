@@ -77,3 +77,12 @@ export async function fetchAmenities(lat: number, lng: number, radius = 1000): P
 
 export const kakaoSearchUrl = (name: string) => `https://map.kakao.com/link/search/${encodeURIComponent(name)}`;
 export const kakaoMapUrl = (name: string, lat: number, lng: number) => `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`;
+
+/** 카카오맵·네이버지도 앱에서 이 자리 주변을 검색한다. 앱이 없으면 웹 지도로 연다. */
+export const nearbyLinks = (q: string, lat: number, lng: number) => ({
+  kakao: { app: `kakaomap://search?q=${encodeURIComponent(q)}&p=${lat},${lng}`, web: `https://m.map.kakao.com/actions/searchView?q=${encodeURIComponent(q)}` },
+  naver: {
+    app: `nmap://search?query=${encodeURIComponent(q)}&lat=${lat}&lng=${lng}&appname=com.fishingjokbo.app`,
+    web: `https://map.naver.com/p/search/${encodeURIComponent(q)}?c=${lng},${lat},15,0,0,0,dh`,
+  },
+});
